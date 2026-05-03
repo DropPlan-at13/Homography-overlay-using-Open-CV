@@ -1,14 +1,16 @@
 # Book Homography Tracker (Python + OpenCV)
 
-Real-time webcam tracker for a planar book cover using feature matching + RANSAC homography.
+Real-time webcam tracker for a planar book cover or banner using feature matching, robust geometry, and a split-screen OpenCV UI.
 
 ## Features
-- Press `S` to capture a reference frame (book cover)
+- Press `S` to capture a reference frame
+- Square capture region to limit background influence during reference capture
 - Split-screen UI:
   - Left: live tracking view
   - Right: fixed reference image
-- Green cross-panel lines for inlier feature matches (demo-style)
-- Robust matching and homography validation
+- Green cross-panel lines for inlier feature matches during active tracking
+- Homography plus affine fallback for rotation tolerance
+- Temporal optical-flow recovery for CPU-only machines
 - Status states: `IDLE`, `TRACKING`, `LOST`
 - Press `R` to reset reference, `Q` to quit
 
@@ -27,34 +29,29 @@ python main.py
 - `R`: reset reference
 - `Q`: quit
 
-## Test (smoke)
+## Test
 ```bash
 python -m pytest -q
 ```
 
 ## Notes
-- Use textured, matte book covers for best results.
-- Avoid glossy or plain covers with little text/contrast.
+- Use textured, matte book covers or banners for best results.
+- On CPU-only laptops, the pipeline uses lighter feature settings plus temporal tracking to keep FPS stable.
 
-## Tutorial-Style Workflow (Reference Alignment)
-This implementation follows the same core flow used in standard OpenCV homography tracking tutorials:
-
-1. Capture reference frame on `S`
+## Workflow
+1. Capture the target inside the square ROI on `S`
 2. Detect keypoints/descriptors on reference and live frame
-3. Match descriptors with ratio-test filtering
-4. Estimate homography with RANSAC
-5. Project reference corners to live frame and draw polygon
-6. Keep/lose track using inlier and reprojection validation (`TRACKING` / `LOST`)
+3. Match descriptors with ratio-test and mutual consistency filtering
+4. Estimate homography or affine transform with robust estimation
+5. Project reference corners to the live frame and draw the polygon
+6. Keep or lose track using inlier, reprojection, and temporal validation
 
-If you want strict one-to-one alignment with your linked video (same detector, thresholds, and UI style), share the exact settings or key timestamps and I will tune `src/book_tracker/config.py` accordingly.
-
-## Detailed Summary & Analysis
-
+## Detailed Summary
 For comprehensive project documentation including:
-- Full configuration values and thresholds
+- Configuration values and thresholds
 - Module descriptions and logic flow
 - Troubleshooting guide
 - Interview talking points
-- Performance metrics and deployment notes
+- Performance notes
 
-See **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** — suitable for sharing with recruiters, teammates, and code reviewers.
+See [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md).
