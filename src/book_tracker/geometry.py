@@ -2,22 +2,28 @@ import cv2
 import numpy as np
 
 
-def _homography_method():
-    # USAC_MAGSAC is more stable than plain RANSAC for outlier-heavy, rotated views.
-    return getattr(cv2, "USAC_MAGSAC", cv2.RANSAC)
+def compute_homography(src_pts, dst_pts, ransac_thresh=5.0):
+    """Estimate a planar homography using the standard OpenCV RANSAC call."""
+    if src_pts is None or dst_pts is None:
+        return None, None
+    if len(src_pts) < 4 or len(dst_pts) < 4:
+        return None, None
+    src_pts = np.float32(src_pts).reshape(-1, 1, 2)
+    dst_pts = np.float32(dst_pts).reshape(-1, 1, 2)
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, float(ransac_thresh))
+    return H, mask
 
 
-def homography_from_matches(kp_ref, kp_live, matches, ransac_thresh=3.0):
+def homography_from_matches(kp_ref, kp_live, matches, ransac_thresh=5.0):
     if len(matches) < 4:
         return None, None
-    ref_pts = np.float32([kp_ref[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-    live_pts = np.float32([kp_live[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-    method = _homography_method()
-    try:
-        H, mask = cv2.findHomography(ref_pts, live_pts, method, ransac_thresh, confidence=0.999, maxIters=5000)
-    except TypeError:
-        H, mask = cv2.findHomography(ref_pts, live_pts, method, ransac_thresh)
-    return H, mask
+    ref_pts = [kp_ref[m.queryIdx].pt for m in matches]
+    live_pts = [kp_live[m.trainIdx].pt for m in matches]
+    return compute_homography(ref_pts, live_pts, ransac_thresh=ransac_thresh)
+
+
+def compute_homography_from_matches(kp_ref, kp_live, matches, ransac_thresh=5.0):
+    return homography_from_matches(kp_ref, kp_live, matches, ransac_thresh=ransac_thresh)
 
 
 def affine_from_matches(kp_ref, kp_live, matches, ransac_thresh=3.0):

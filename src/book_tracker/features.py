@@ -3,34 +3,27 @@ import numpy as np
 
 
 def create_detector(name: str, max_features: int):
-    """Create feature detector tuned for distributed keypoint detection across character features.
+    """Create a feature detector for planar object tracking.
 
-    SIFT tuning:
-    - contrastThreshold=0.01 (vs default 0.04): detects very soft gradients on character faces/bodies
-    - edgeThreshold=6 (vs default 10): further penalizes sharp edges, maximizes character curve matches
-    - nfeatures increased to 3000: ensures dense coverage despite ultra-soft filtering
-    - sigma=1.5 (vs 1.6): slightly tighter scale-space for finer character detail detection
-
-    ORB tuning:
-    - fastThreshold=8 (vs default 20): picks up very weak corners on character strokes and gradients
-    - edgeThreshold=15 (vs default 31): minimal edge penalty, retains uniform spatial distribution
+    ORB is the default because it is fast on CPU-only laptops. SIFT can be enabled
+    when you want more stable matching on textured objects and can afford the extra cost.
     """
-    name = (name or "SIFT").upper()
+    name = (name or "ORB").upper()
     if name == "SIFT":
         if hasattr(cv2, "SIFT_create"):
             return cv2.SIFT_create(
-                nfeatures=max(2500, max_features),
+                nfeatures=max(2000, max_features),
                 nOctaveLayers=3,
-                contrastThreshold=0.005,
-                edgeThreshold=5,
+                contrastThreshold=0.01,
+                edgeThreshold=10,
                 sigma=1.6
             ), "float"
         if hasattr(cv2, "xfeatures2d"):
             return cv2.xfeatures2d.SIFT_create(
-                nfeatures=max(2500, max_features),
+                nfeatures=max(2000, max_features),
                 nOctaveLayers=3,
-                contrastThreshold=0.005,
-                edgeThreshold=5,
+                contrastThreshold=0.01,
+                edgeThreshold=10,
                 sigma=1.6
             ), "float"
         return cv2.ORB_create(nfeatures=max_features), "binary"
@@ -40,7 +33,7 @@ def create_detector(name: str, max_features: int):
             scaleFactor=1.2,
             nlevels=8,
             edgeThreshold=15,
-            fastThreshold=8
+            fastThreshold=10
         ), "binary"
     if name == "AKAZE":
         return cv2.AKAZE_create(), "binary"
@@ -155,3 +148,8 @@ def detect_and_describe(detector, image, mask=None, bright_threshold=180, min_ma
     if kp is None:
         kp = []
     return kp, desc
+
+
+def compute_features(detector, image, mask=None):
+    """Compute keypoints and descriptors on an image, optionally constrained by a mask."""
+    return detect_and_describe(detector, image, mask=mask)

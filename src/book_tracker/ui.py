@@ -104,13 +104,40 @@ def draw_reference_panel(ref_frame, panel_size):
     return resized
 
 
+def draw_reference_panel_with_roi(ref_frame, panel_size, roi=None):
+    panel = draw_reference_panel(ref_frame, panel_size)
+    if ref_frame is None or roi is None:
+        return panel
+
+    h, w = panel_size
+    x1, y1, x2, y2 = roi
+    scale_x = w / max(1, ref_frame.shape[1])
+    scale_y = h / max(1, ref_frame.shape[0])
+    pt1 = (int(x1 * scale_x), int(y1 * scale_y))
+    pt2 = (int(x2 * scale_x), int(y2 * scale_y))
+    cv2.rectangle(panel, pt1, pt2, (0, 255, 0), 2)
+    return panel
+
+
+def draw_detection(frame, polygon, color=(0, 255, 0), alpha=0.18):
+    """Overlay a detected polygon on the live frame."""
+    if polygon is None:
+        return frame
+    view = frame.copy()
+    pts = np.asarray(polygon, dtype=np.int32)
+    overlay = frame.copy()
+    cv2.fillPoly(overlay, [pts], color)
+    cv2.addWeighted(overlay, alpha, view, 1.0 - alpha, 0, view)
+    cv2.polylines(view, [pts], True, color, 3, cv2.LINE_AA)
+    return view
+
+
 def draw_live_panel(frame, track_result):
     """Draw live panel with tracking polygon and enhanced metrics."""
     view = frame.copy()
     if track_result.polygon is not None:
-        pts = track_result.polygon.astype(np.int32)
         color = (0, 255, 0) if track_result.status == "TRACKING" else (0, 0, 255)
-        cv2.polylines(view, [pts], True, color, 3)
+        view = draw_detection(view, track_result.polygon, color=color, alpha=0.18)
     
     status_color = (0, 255, 0) if track_result.status == "TRACKING" else ((0, 255, 255) if track_result.status == "IDLE" else (0, 0, 255))
     

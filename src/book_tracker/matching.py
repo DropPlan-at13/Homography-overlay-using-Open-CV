@@ -3,9 +3,7 @@ import cv2
 
 def create_matcher(descriptor_kind: str):
     if descriptor_kind == "float":
-        index_params = dict(algorithm=1, trees=5)
-        search_params = dict(checks=64)
-        return cv2.FlannBasedMatcher(index_params, search_params)
+        return cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
     return cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
 
 
@@ -53,3 +51,8 @@ def match_ratio_mutual(matcher, desc_ref, desc_live, ratio=0.75):
         if reverse_best.get(m.trainIdx) == m.queryIdx:
             mutual.append(m)
     return mutual
+
+
+def match_features(matcher, desc_ref, desc_live, ratio=0.75):
+    """Match descriptors with Lowe's ratio test."""
+    return match_ratio(matcher, desc_ref, desc_live, ratio=ratio)
