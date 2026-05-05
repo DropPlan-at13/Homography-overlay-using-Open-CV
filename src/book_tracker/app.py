@@ -17,7 +17,7 @@ from .geometry import (
     polygon_is_plausible,
 )
 from .tracker import TrackStateMachine, TrackResult
-from .ui import draw_reference_panel, draw_live_panel, compose_video_style_view, draw_capture_boundary, create_square_mask
+from .ui import draw_reference_panel, draw_live_panel, compose_video_style_view, draw_capture_boundary, create_square_mask, create_polygon_mask
 
 
 def _empty_result(status="IDLE"):
@@ -56,11 +56,21 @@ def main():
             effective_matches = 0
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if ref_frame is not None and desc_ref is not None:
+                live_roi_mask = None
+                if state.prev_polygon is not None:
+                    live_roi_mask = create_polygon_mask(frame.shape, state.prev_polygon, padding=24)
+
                 live_mask = create_bright_mask(
                     frame,
                     threshold=cfg.bright_threshold,
                     min_mask_pixels=cfg.min_mask_pixels,
                 )
+                if live_roi_mask is not None:
+                    if live_mask is not None:
+                        live_mask = cv2.bitwise_and(live_mask, live_roi_mask)
+                    else:
+                        live_mask = live_roi_mask
+
                 kp_live, desc_live = detect_and_describe(
                     detector,
                     frame,

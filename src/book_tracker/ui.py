@@ -71,6 +71,27 @@ def create_square_mask(frame_shape, square_size=550):
     mask[y1:y2, x1:x2] = 255
     return mask
 
+def create_polygon_mask(frame_shape, polygon, padding=18):
+    """Create a filled mask from a projected quadrilateral and expand it slightly.
+
+    The padding helps keep features near the object boundary while still excluding
+    most background structure outside the tracked region.
+    """
+    h, w = frame_shape[:2]
+    mask = np.zeros((h, w), dtype=np.uint8)
+    if polygon is None:
+        return mask
+
+    pts = np.asarray(polygon, dtype=np.float32).reshape(-1, 2)
+    if len(pts) < 3:
+        return mask
+
+    cv2.fillPoly(mask, [pts.astype(np.int32)], 255)
+    if padding > 0:
+        kernel = np.ones((max(3, padding // 2), max(3, padding // 2)), np.uint8)
+        mask = cv2.dilate(mask, kernel, iterations=1)
+    return mask
+
 
 def draw_reference_panel(ref_frame, panel_size):
     h, w = panel_size
