@@ -14,8 +14,8 @@ class TrackerConfig:
     bright_threshold: int = 100
     min_mask_pixels: int = 400
     camera_index: int = 0
-    frame_width: int = 960
-    frame_height: int = 540
+    frame_width: int = 854
+    frame_height: int = 480
     smooth_alpha: float = 0.35
     lost_after_frames: int = 8
     square_roi_size: int = 550

@@ -35,6 +35,9 @@ def main():
     if not cap.isOpened():
         raise RuntimeError("Could not open camera")
 
+    cv2.namedWindow("Book Homography Tracker", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Book Homography Tracker", 1600, 900)
+
     ref_frame = None
     ref_gray = None
     ref_mask = None
@@ -72,20 +75,16 @@ def main():
 
             live_mask = None
             if ref_frame is not None and desc_ref is not None:
-                live_roi_mask = None
-                if state.prev_polygon is not None:
-                    live_roi_mask = create_polygon_mask(frame.shape, state.prev_polygon, padding=24)
-
-                live_mask = create_bright_mask(
-                    frame,
-                    threshold=cfg.bright_threshold,
-                    min_mask_pixels=cfg.min_mask_pixels,
-                )
-                if live_roi_mask is not None:
-                    if live_mask is not None:
-                        live_mask = cv2.bitwise_and(live_mask, live_roi_mask)
-                    else:
-                        live_mask = live_roi_mask
+                if state.status == "TRACKING" and state.prev_polygon is not None:
+                    # Once tracking is established, stay inside the object only.
+                    live_mask = create_polygon_mask(frame.shape, state.prev_polygon, padding=12)
+                else:
+                    # During reacquisition, use the bright-object heuristic.
+                    live_mask = create_bright_mask(
+                        frame,
+                        threshold=cfg.bright_threshold,
+                        min_mask_pixels=cfg.min_mask_pixels,
+                    )
 
             if ref_frame is not None and desc_ref is not None and use_keyframe_refresh:
                 kp_live, desc_live = detect_and_describe(
@@ -156,6 +155,7 @@ def main():
                         ecc_polygon = project_reference_corners_affine(ecc_warp, ref_frame.shape)
                         if polygon_is_plausible(ecc_polygon, frame.shape):
                             polygon = ecc_polygon
+                            state.prev_polygon = ecc_polygon.copy()
 
                 # Temporal refinement/recovery: use KLT optical flow between consecutive frames
                 # to keep tracking stable when clockwise rotation weakens descriptor matching.

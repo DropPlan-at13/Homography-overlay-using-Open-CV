@@ -71,11 +71,11 @@ def create_square_mask(frame_shape, square_size=550):
     mask[y1:y2, x1:x2] = 255
     return mask
 
-def create_polygon_mask(frame_shape, polygon, padding=18):
-    """Create a filled mask from a projected quadrilateral and expand it slightly.
+def create_polygon_mask(frame_shape, polygon, padding=12):
+    """Create a filled mask from a projected quadrilateral and tighten it slightly.
 
-    The padding helps keep features near the object boundary while still excluding
-    most background structure outside the tracked region.
+    The padding parameter is used as an inward margin so live features stay inside
+    the tracked object instead of leaking onto nearby background texture.
     """
     h, w = frame_shape[:2]
     mask = np.zeros((h, w), dtype=np.uint8)
@@ -89,7 +89,7 @@ def create_polygon_mask(frame_shape, polygon, padding=18):
     cv2.fillPoly(mask, [pts.astype(np.int32)], 255)
     if padding > 0:
         kernel = np.ones((max(3, padding // 2), max(3, padding // 2)), np.uint8)
-        mask = cv2.dilate(mask, kernel, iterations=1)
+        mask = cv2.erode(mask, kernel, iterations=1)
     return mask
 
 
