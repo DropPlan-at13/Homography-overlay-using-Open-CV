@@ -75,6 +75,64 @@ def affine_from_points(ref_pts, live_pts, ransac_thresh=3.0):
     return A, mask
 
 
+def refine_affine_with_ecc(template_gray, input_gray, init_warp=None, template_mask=None, input_mask=None, criteria=None, gauss_filt_size=5):
+    """Refine an affine warp with OpenCV ECC inside a masked ROI.
+
+    ECC is an area-based alignment method that can smooth out sparse-match jitter
+    and keep the object outline continuous through moderate rotation.
+    """
+    if template_gray is None or input_gray is None:
+        return None, float("-inf")
+
+    template = np.asarray(template_gray)
+    image = np.asarray(input_gray)
+    if template.ndim != 2 or image.ndim != 2:
+        return None, float("-inf")
+
+    if template.dtype != np.float32:
+        template = template.astype(np.float32)
+    if image.dtype != np.float32:
+        image = image.astype(np.float32)
+    if template.max(initial=0.0) > 1.5:
+        template /= 255.0
+    if image.max(initial=0.0) > 1.5:
+        image /= 255.0
+
+    warp = np.eye(2, 3, dtype=np.float32) if init_warp is None else np.asarray(init_warp, dtype=np.float32).copy()
+    if warp.shape != (2, 3):
+        warp = np.eye(2, 3, dtype=np.float32)
+
+    if criteria is None:
+        criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 60, 1e-5)
+
+    try:
+        if hasattr(cv2, "findTransformECCWithMask") and template_mask is not None and input_mask is not None:
+            cc, warp = cv2.findTransformECCWithMask(
+                template,
+                image,
+                np.asarray(template_mask, dtype=np.uint8),
+                np.asarray(input_mask, dtype=np.uint8),
+                warp,
+                cv2.MOTION_AFFINE,
+                criteria,
+                gauss_filt_size,
+            )
+        else:
+            cc, warp = cv2.findTransformECC(
+                template,
+                image,
+                warp,
+                cv2.MOTION_AFFINE,
+                criteria,
+                input_mask if input_mask is not None else template_mask,
+                gauss_filt_size,
+            )
+    except (cv2.error, TypeError, ValueError):
+        return None, float("-inf")
+
+    return warp, float(cc)
+
+
 def reprojection_error_from_points(T, ref_pts, live_pts, inlier_mask):
     if T is None or inlier_mask is None:
         return float("inf")

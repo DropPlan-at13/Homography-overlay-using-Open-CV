@@ -12,6 +12,7 @@ from .geometry import (
     homography_from_matches,
     reprojection_error,
     reprojection_error_from_points,
+    refine_affine_with_ecc,
     project_reference_corners,
     project_reference_corners_affine,
     polygon_is_plausible,
@@ -35,6 +36,8 @@ def main():
         raise RuntimeError("Could not open camera")
 
     ref_frame = None
+    ref_gray = None
+    ref_mask = None
     kp_ref = None
     desc_ref = None
     prev_gray = None
@@ -124,6 +127,21 @@ def main():
                     inlier_mask = None
 
                 ok = model_ok
+
+                if ok and cfg.ecc_enabled and ref_gray is not None:
+                    ecc_warp, ecc_cc = refine_affine_with_ecc(
+                        ref_gray,
+                        gray,
+                        init_warp=A if A is not None else None,
+                        template_mask=ref_mask,
+                        input_mask=live_mask,
+                        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, cfg.ecc_max_iterations, cfg.ecc_epsilon),
+                        gauss_filt_size=cfg.ecc_gauss_filter_size,
+                    )
+                    if ecc_warp is not None and ecc_cc >= cfg.ecc_min_correlation:
+                        ecc_polygon = project_reference_corners_affine(ecc_warp, ref_frame.shape)
+                        if polygon_is_plausible(ecc_polygon, frame.shape):
+                            polygon = ecc_polygon
 
                 # Temporal refinement/recovery: use KLT optical flow between consecutive frames
                 # to keep tracking stable when clockwise rotation weakens descriptor matching.
@@ -226,6 +244,7 @@ def main():
                 break
             if key == ord("s"):
                 ref_frame = frame.copy()
+                ref_gray = cv2.cvtColor(ref_frame, cv2.COLOR_BGR2GRAY)
                 
                 # Create square ROI mask (centered, configurable size)
                 square_mask = create_square_mask(ref_frame.shape, square_size=cfg.square_roi_size)
@@ -242,6 +261,7 @@ def main():
                     combined_mask = cv2.bitwise_and(square_mask, ref_bright_mask)
                 else:
                     combined_mask = square_mask
+                ref_mask = combined_mask
                 
                 kp_ref, desc_ref = detect_and_describe(
                     detector,
@@ -254,6 +274,8 @@ def main():
                 # Start in IDLE; state machine will transition to TRACKING after first successful match
             if key == ord("r"):
                 ref_frame = None
+                ref_gray = None
+                ref_mask = None
                 kp_ref = None
                 desc_ref = None
                 state.reset()

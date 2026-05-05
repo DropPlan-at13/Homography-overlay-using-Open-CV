@@ -22,3 +22,8 @@ class TrackerConfig:
     temporal_flow_min_points: int = 20
     temporal_flow_win_size: int = 21
     temporal_flow_max_level: int = 3
+    ecc_enabled: bool = True
+    ecc_min_correlation: float = 0.75
+    ecc_max_iterations: int = 60
+    ecc_epsilon: float = 1e-5
+    ecc_gauss_filter_size: int = 5
