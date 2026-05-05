@@ -43,6 +43,7 @@ def main():
     prev_gray = None
     prev_ref_pts = None
     prev_live_pts = None
+    frame_index = 0
     frame_count = 0
     t0 = time.time()
 
@@ -58,6 +59,18 @@ def main():
             inlier_mask = None
             effective_matches = 0
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            use_keyframe_refresh = (
+                ref_frame is not None
+                and desc_ref is not None
+                and (
+                    state.status != "TRACKING"
+                    or frame_index % cfg.keyframe_interval == 0
+                    or prev_live_pts is None
+                    or prev_ref_pts is None
+                )
+            )
+
+            live_mask = None
             if ref_frame is not None and desc_ref is not None:
                 live_roi_mask = None
                 if state.prev_polygon is not None:
@@ -74,6 +87,7 @@ def main():
                     else:
                         live_mask = live_roi_mask
 
+            if ref_frame is not None and desc_ref is not None and use_keyframe_refresh:
                 kp_live, desc_live = detect_and_describe(
                     detector,
                     frame,
@@ -128,7 +142,7 @@ def main():
 
                 ok = model_ok
 
-                if ok and cfg.ecc_enabled and ref_gray is not None:
+                if ok and cfg.ecc_enabled and ref_gray is not None and frame_index % cfg.ecc_interval == 0:
                     ecc_warp, ecc_cc = refine_affine_with_ecc(
                         ref_gray,
                         gray,
@@ -193,6 +207,10 @@ def main():
                                     prev_ref_pts = flow_ref_pts.reshape(-1, 1, 2)
                                     prev_live_pts = flow_live_pts.reshape(-1, 1, 2)
 
+                        if ok and prev_ref_pts is None and prev_live_pts is None:
+                            prev_ref_pts = np.float32([kp_ref[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+                            prev_live_pts = np.float32([kp_live[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+
                 if ok and inlier_mask is not None and kp_live is not None and len(matches) > 0:
                     inlier_keep = inlier_mask.ravel().astype(bool)
                     inlier_matches = [m for m, keep in zip(matches, inlier_keep) if keep]
@@ -209,6 +227,39 @@ def main():
                 result = state.update(ok, polygon, effective_matches, inliers, inlier_ratio, reproj)
 
                 prev_gray = gray
+            elif ref_frame is not None and desc_ref is not None and state.status == "TRACKING" and prev_gray is not None and prev_live_pts is not None and prev_ref_pts is not None:
+                next_pts, st, _err = cv2.calcOpticalFlowPyrLK(
+                    prev_gray,
+                    gray,
+                    np.float32(prev_live_pts),
+                    None,
+                    winSize=(cfg.temporal_flow_win_size, cfg.temporal_flow_win_size),
+                    maxLevel=cfg.temporal_flow_max_level,
+                    criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03),
+                )
+                if next_pts is not None and st is not None:
+                    flow_keep = st.ravel().astype(bool)
+                    flow_ref_pts = np.float32(prev_ref_pts)[flow_keep]
+                    flow_live_pts = np.float32(next_pts)[flow_keep]
+                    if len(flow_ref_pts) >= cfg.temporal_flow_min_points:
+                        A_flow, A_flow_mask = affine_from_points(flow_ref_pts, flow_live_pts, ransac_thresh=cfg.ransac_thresh)
+                        if A_flow is not None and A_flow_mask is not None:
+                            flow_inliers = int(A_flow_mask.sum())
+                            flow_ratio = float(flow_inliers / len(flow_ref_pts)) if len(flow_ref_pts) > 0 else 0.0
+                            flow_polygon = project_reference_corners_affine(A_flow, ref_frame.shape)
+                            flow_reproj = reprojection_error_from_points(A_flow, flow_ref_pts, flow_live_pts, A_flow_mask)
+                            flow_ok = (
+                                flow_inliers >= cfg.min_inliers
+                                and flow_ratio >= cfg.min_inlier_ratio
+                                and flow_reproj <= cfg.max_reproj_error
+                                and polygon_is_plausible(flow_polygon, frame.shape)
+                            )
+
+                            if flow_ok:
+                                result = state.update(True, flow_polygon, len(flow_ref_pts), flow_inliers, flow_ratio, flow_reproj)
+                                prev_ref_pts = flow_ref_pts.reshape(-1, 1, 2)
+                                prev_live_pts = flow_live_pts.reshape(-1, 1, 2)
+                                prev_gray = gray
 
             panel_ref = draw_reference_panel(ref_frame, (frame.shape[0], frame.shape[1]))
             panel_live = draw_live_panel(frame, result)
@@ -279,6 +330,8 @@ def main():
                 kp_ref = None
                 desc_ref = None
                 state.reset()
+
+            frame_index += 1
 
     finally:
         cap.release()
