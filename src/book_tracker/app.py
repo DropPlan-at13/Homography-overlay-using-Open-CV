@@ -313,11 +313,12 @@ def main():
                 else:
                     combined_mask = square_mask
                 ref_mask = create_foreground_mask(ref_frame, combined_mask, iterations=5)
+                ref_feature_mask = ref_mask if ref_mask is not None else combined_mask
                 
                 kp_ref, desc_ref = detect_and_describe(
                     detector,
                     ref_frame,
-                    mask=combined_mask,
+                    mask=ref_feature_mask,
                     bright_threshold=cfg.bright_threshold,
                     min_mask_pixels=cfg.min_mask_pixels,
                 )
