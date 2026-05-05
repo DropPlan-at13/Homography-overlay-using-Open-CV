@@ -6,7 +6,7 @@ import numpy as np
 from .capture import open_camera, read_frame
 from .config import TrackerConfig
 from .features import compute_features as _compute_features, create_detector
-from .geometry import compute_homography as _compute_homography, polygon_is_plausible, reprojection_error
+from .geometry import homography_from_matches, polygon_is_plausible, reprojection_error
 from .matching import create_matcher, match_features as _match_features
 from .tracker import TrackResult, TrackStateMachine
 from .ui import compose_video_style_view, draw_detection, draw_live_panel, draw_reference_panel_with_roi
@@ -118,7 +118,7 @@ def match_features(matcher, desc_ref, desc_live, ratio=0.75):
 def compute_homography(kp_ref, kp_live, matches, ransac_thresh=5.0):
     if kp_ref is None or kp_live is None or matches is None or len(matches) < 4:
         return None, None
-    return _compute_homography(kp_ref, kp_live, matches, ransac_thresh=ransac_thresh)
+    return homography_from_matches(kp_ref, kp_live, matches, ransac_thresh=ransac_thresh)
 
 
 def main():
