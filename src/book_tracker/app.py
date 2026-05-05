@@ -4,7 +4,7 @@ import numpy as np
 
 from .capture import open_camera, read_frame
 from .config import TrackerConfig
-from .features import create_detector, detect_and_describe, create_bright_mask
+from .features import create_detector, detect_and_describe, create_bright_mask, create_foreground_mask
 from .matching import create_matcher, match_ratio_mutual
 from .geometry import (
     affine_from_matches,
@@ -312,7 +312,7 @@ def main():
                     combined_mask = cv2.bitwise_and(square_mask, ref_bright_mask)
                 else:
                     combined_mask = square_mask
-                ref_mask = combined_mask
+                ref_mask = create_foreground_mask(ref_frame, combined_mask, iterations=5)
                 
                 kp_ref, desc_ref = detect_and_describe(
                     detector,

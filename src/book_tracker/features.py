@@ -105,6 +105,44 @@ def create_bright_mask(image, threshold=170, min_mask_pixels=800):
     return None
 
 
+def create_foreground_mask(image, seed_mask, iterations=5):
+    """Refine a seed mask into a foreground mask using GrabCut.
+
+    This is run only at reference capture time, so the extra work is acceptable.
+    The goal is to keep object features and remove background descriptors before
+    matching starts.
+    """
+    gray = to_gray(image)
+    if gray is None or seed_mask is None:
+        return seed_mask
+
+    if image.ndim == 2:
+        color = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    else:
+        color = image.copy()
+
+    gc_mask = np.full(gray.shape, cv2.GC_BGD, dtype=np.uint8)
+    gc_mask[seed_mask > 0] = cv2.GC_PR_FGD
+
+    bgd_model = np.zeros((1, 65), np.float64)
+    fgd_model = np.zeros((1, 65), np.float64)
+
+    try:
+        cv2.grabCut(color, gc_mask, None, bgd_model, fgd_model, int(iterations), cv2.GC_INIT_WITH_MASK)
+    except cv2.error:
+        return seed_mask
+
+    fg_mask = np.where((gc_mask == cv2.GC_FGD) | (gc_mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+
+    kernel = np.ones((5, 5), np.uint8)
+    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel)
+    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
+
+    if int(fg_mask.sum() // 255) < 100:
+        return seed_mask
+    return fg_mask
+
+
 def detect_and_describe(detector, image, mask=None, bright_threshold=180, min_mask_pixels=800):
     gray = to_gray(image)
     if gray is None:
