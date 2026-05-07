@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class TrackerConfig:
-    detector: str = "ORB"
+    detector: str = "SIFT"
     max_features: int = 1200
     ratio_test: float = 0.75
     ransac_thresh: float = 5.0

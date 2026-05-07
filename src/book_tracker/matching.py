@@ -54,5 +54,5 @@ def match_ratio_mutual(matcher, desc_ref, desc_live, ratio=0.75):
 
 
 def match_features(matcher, desc_ref, desc_live, ratio=0.75):
-    """Match descriptors with Lowe's ratio test."""
-    return match_ratio(matcher, desc_ref, desc_live, ratio=ratio)
+    """Match descriptors with Lowe's ratio test and mutual consistency."""
+    return match_ratio_mutual(matcher, desc_ref, desc_live, ratio=ratio)

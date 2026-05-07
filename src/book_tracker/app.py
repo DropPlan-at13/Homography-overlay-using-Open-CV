@@ -142,9 +142,42 @@ def main():
     desc_ref = None
 
     frame_count = 0
-    start_time = time.time()
 
     try:
+        # Initial capture phase
+        while True:
+            frame = read_frame(cap)
+            if frame is None:
+                return
+            
+            display_frame = frame.copy()
+            cv2.putText(
+                display_frame,
+                "Show the object. Press 'C' to capture or 'Q' to quit.",
+                (18, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 255, 255),
+                2,
+            )
+            cv2.imshow(WINDOW_NAME, display_frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
+                return
+            if key == ord("c"):
+                frozen = frame.copy()
+                cv2.imshow(WINDOW_NAME, frozen)
+                roi = select_roi(WINDOW_NAME, frozen)
+                if roi is not None:
+                    reference_frame = frozen.copy()
+                    reference_roi = roi
+                    reference_mask = _roi_to_mask(reference_frame.shape, roi)
+                    kp_ref, desc_ref = compute_features(detector, reference_frame, reference_mask)
+                    if desc_ref is not None and kp_ref is not None and len(kp_ref) >= 4:
+                        break
+
+        start_time = time.time()
+
         while True:
             frame = read_frame(cap)
             if frame is None:
